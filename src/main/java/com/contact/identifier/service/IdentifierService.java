@@ -28,6 +28,7 @@ public class IdentifierService {
 	    boolean hasEmail = email != null && !email.isEmpty();
 	    boolean hasPhoneNumber = phoneNumber != null && !phoneNumber.isEmpty();
 	    
+	    //Null request.
 	    if(!hasEmail && !hasPhoneNumber)
 	    	return null;
 	    
@@ -36,7 +37,7 @@ public class IdentifierService {
 	    Contact newContact = null;
         IdentifierResult result = null;
         
-        //Both email and phone number matched and point to same contact.
+        //Both email and phone number matched and point to same contact.(Exact copy).
 	    if (existingContactByEmail.isPresent() && existingContactByPhoneNumber.isPresent() &&
 	        existingContactByEmail.get().equals(existingContactByPhoneNumber.get())) {
 	        result = createIdentifierResult(existingContactByEmail.get());
@@ -57,7 +58,7 @@ public class IdentifierService {
 	                result = createIdentifierResult(c1);
 	            }
 
-	        //one matched to a secondary and another to a primary and vice versa.
+	        //one matched to a secondary and another to a primary and vice versa.--> no new information, so no new entry to db.
 	        } else if (c1.getLinkPrecedence().equals("secondary") && c2.getLinkPrecedence().equals("primary")) {
 	            result = createIdentifierResult(c2);
 	        } else if (c1.getLinkPrecedence().equals("primary") && c2.getLinkPrecedence().equals("secondary")) {
@@ -69,12 +70,12 @@ public class IdentifierService {
 	    else if (existingContactByEmail.isPresent()) {
 	        Contact c1 = existingContactByEmail.get();
 	        
-	        //matched with a secondary contact.
+	        //matched with a secondary contact.--> create a new secondary if has phone number too.
 	        if(c1.getLinkPrecedence().equals("secondary")) { 
 	        	if(hasPhoneNumber) newContact = saveNewContact(email, phoneNumber, "secondary", c1.getLinkedContact());
 	        	result = createIdentifierResult(c1.getLinkedContact());
 	        }
-	        //matched with a primary contact.
+	        //matched with a primary contact.--> create a new secondary if has phone number too.
 	        else {
 	        	if(hasPhoneNumber) newContact = saveNewContact(email, phoneNumber, "secondary", c1);
 	            result = createIdentifierResult(c1);
@@ -85,18 +86,18 @@ public class IdentifierService {
 	    else if (existingContactByPhoneNumber.isPresent()) {
 	        Contact c2 = existingContactByPhoneNumber.get();
 	        
-	        //matched with a secondary contact.
+	        //matched with a secondary contact.--> create a new secondary if has email too.
 	        if (c2.getLinkPrecedence().equals("secondary")) {
 	            if(hasEmail) newContact = saveNewContact(email, phoneNumber, "secondary", c2.getLinkedContact());
 	            result = createIdentifierResult(c2.getLinkedContact());
 	        }
-	        //matched with a primary contact.
+	        //matched with a primary contact.--> create a new secondary if has email too.
 	        else {
 	        	if(hasEmail) newContact = saveNewContact(email, phoneNumber, "secondary", c2);
 	            result = createIdentifierResult(c2);
 	        }
 	    } 
-	    //nothing matched.
+	    //nothing matched.arrival of a new Primary contact.
 	    else {
 	    	newContact = saveNewContact(email, phoneNumber, "primary", null);
 		    result = createIdentifierResult(newContact);
@@ -105,12 +106,14 @@ public class IdentifierService {
 	}
 
 	private void changePrimaryToSecondary(Contact primaryContact, Contact newSecondaryContact) {
-		
+		//Changes an existing primary contact to secondary contact.  
 		newSecondaryContact.setLinkPrecedence("secondary");
 		newSecondaryContact.setUpdatedAt(LocalDateTime.now());
 		newSecondaryContact.setLinkedContact(primaryContact);
         newSecondaryContact = contactRepository.save(newSecondaryContact);
 		List<Contact> secondaryContacts = contactRepository.findByLinkedContact(newSecondaryContact);
+		
+		//Also changes the linked contact field from secondary(earlier primary) to currently primary contact.
 		for(Contact sContact:secondaryContacts) {
 			sContact.setLinkedContact(primaryContact);
 			sContact.setUpdatedAt(LocalDateTime.now());
@@ -118,7 +121,7 @@ public class IdentifierService {
 	}
 
 	private Contact saveNewContact(String email, String phoneNumber, String string, Contact linkedContact) {
-		
+		//creates and saves a new contact.
 		Contact newContact = new Contact();
 		newContact.setEmail(email);
 		newContact.setPhoneNumber(phoneNumber);
@@ -130,7 +133,7 @@ public class IdentifierService {
 	}
 
     private IdentifierResult createIdentifierResult(Contact primaryContact) {
-    	
+    	//generate the response output.
         List<Contact> secondaryContacts = contactRepository.findByLinkedContact(primaryContact);
         Set<String> emails = new HashSet<>();
         emails.add(primaryContact.getEmail());
